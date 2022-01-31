@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using JetBrains.Annotations;
 
 namespace GameFinder.StoreHandlers.Steam
@@ -9,46 +9,50 @@ namespace GameFinder.StoreHandlers.Steam
     [PublicAPI]
     public class SteamGame : AStoreGame
     {
+
+
         /// <inheritdoc cref="AStoreGame.StoreType"/>
         public override StoreType StoreType => StoreType.Steam;
 
         /// <summary>
         /// Steam ID of the game
         /// </summary>
-        public int ID { get; internal set; } = -1;
+        public int ID { get; set; } = -1;
 
         /// <summary>
         /// Time when the game was last updated
         /// </summary>
-        public DateTime LastUpdated { get; internal set; } = DateTime.UnixEpoch;
+        public DateTime LastUpdated { get; set; } = DateTime.UnixEpoch;
 
         /// <summary>
         /// Size of the game on disk in bytes
         /// </summary>
-        public long SizeOnDisk { get; internal set; } = -1;
+        public long SizeOnDisk { get; set; } = -1;
 
         /// <summary>
         /// Amount of bytes to download
         /// </summary>
-        public long BytesToDownload { get; internal set; } = -1;
-        
+        public long BytesToDownload { get; set; } = -1;
+
         /// <summary>
         /// Amount of bytes already downloaded
         /// </summary>
-        public long BytesDownloaded { get; internal set; } = -1;
-        
+        public long BytesDownloaded { get; set; } = -1;
+
         /// <summary>
         /// Amount of bytes to stage
         /// </summary>
-        public long BytesToStage { get; internal set; } = -1;
-        
+        public long BytesToStage { get; set; } = -1;
+
         /// <summary>
         /// Amount of bytes already staged
         /// </summary>
-        public long BytesStaged { get; internal set; } = -1;
+        public long BytesStaged { get; set; } = -1;
+
+
 
         #region Overrides
-        
+
         /// <inheritdoc />
         public override int CompareTo(AStoreGame? other)
         {
@@ -59,7 +63,7 @@ namespace GameFinder.StoreHandlers.Steam
                 _ => base.CompareTo(other)
             };
         }
-        
+
         /// <inheritdoc />
         public override bool Equals(AStoreGame? other)
         {
@@ -82,19 +86,25 @@ namespace GameFinder.StoreHandlers.Steam
                 _ => false
             };
         }
-        
+
         /// <inheritdoc />
         public override int GetHashCode()
         {
             return ID;
         }
-        
+
         /// <inheritdoc />
         public override string ToString()
         {
             return $"{base.ToString()} ({ID})";
         }
-        
+
+        /// <inheritdoc />
+        public override object Clone()
+        {
+            return this.MemberwiseClone();
+        }
+
         #endregion
     }
 }

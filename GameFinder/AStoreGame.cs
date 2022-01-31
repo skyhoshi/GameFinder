@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using JetBrains.Annotations;
 
 namespace GameFinder
@@ -7,17 +7,17 @@ namespace GameFinder
     /// Abstract class of a Store Game
     /// </summary>
     [PublicAPI]
-    public abstract class AStoreGame : IComparable<AStoreGame>, IEquatable<AStoreGame>
+    public abstract class AStoreGame : IComparable<AStoreGame>, IEquatable<AStoreGame>, ICloneable
     {
         /// <summary>
         /// Name of the Game
         /// </summary>
-        public virtual string Name { get; internal set; } = string.Empty;
+        public virtual string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Path to the Game
         /// </summary>
-        public virtual string Path { get; internal set; } = string.Empty;
+        public virtual string Path { get; set; } = string.Empty;
 
         /// <summary>
         /// Store Type
@@ -31,7 +31,7 @@ namespace GameFinder
         {
             return string.Compare(Name, other?.Name, StringComparison.OrdinalIgnoreCase);
         }
-        
+
         /// <inheritdoc />
         public virtual bool Equals(AStoreGame? other)
         {
@@ -60,7 +60,10 @@ namespace GameFinder
         {
             return $"{Name}";
         }
-        
+
+        /// <inheritdoc />
+        public abstract object Clone();
+
         #endregion
     }
 }

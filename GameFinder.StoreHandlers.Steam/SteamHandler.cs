@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Win32;
 
 namespace GameFinder.StoreHandlers.Steam
 {
@@ -26,8 +29,8 @@ namespace GameFinder.StoreHandlers.Steam
         /// Path to the Steam Installation Directory
         /// </summary>
         public readonly string? SteamPath;
-        private string? SteamConfig { get; set; }
-        private string? SteamLibraries { get; set; }
+        public virtual string? SteamConfig { get; set; }
+        public virtual string? SteamLibraries { get; set; }
 
         /// <summary>
         /// List of all found Steam Universes
@@ -38,57 +41,91 @@ namespace GameFinder.StoreHandlers.Steam
         /// True if steam was found.
         /// </summary>
         public readonly bool FoundSteam;
-        
-        
+
+
         /// <summary>
         /// Default constructor.
         /// </summary>
-        public SteamHandler(): this(NullLogger.Instance) { }
-        
+        public SteamHandler() : this(NullLogger.Instance) { }
+
         /// <summary>
         /// Default constructor.
         /// </summary>
         /// <param name="logger">Logger instance to use, will default to <see cref="NullLogger"/></param>
         public SteamHandler(ILogger? logger = null) : base(logger ?? NullLogger.Instance)
         {
-#if Windows
-            using var steamKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(SteamRegKey);
-            if (steamKey == null)
+            bool isWindows = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+            string steamPath = "";
+            if (isWindows)
             {
-                Logger.LogError("Unable to open registry key {SteamKey}", steamKey);
-                return;
+                using RegistryKey? steamKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(SteamRegKey);
+                if (steamKey == null)
+                {
+                    Logger.LogError("Unable to open registry key {SteamKey}", steamKey);
+                    return;
+                }
+
+                var steamPathPossible = RegistryUtils.RegistryHelper.GetStringValueFromRegistry(steamKey, "SteamPath", Logger);
+
+                if (steamPathPossible == null) return;
+
+                if (!Directory.Exists(steamPathPossible))
+                {
+                    Logger.LogError("Path to Steam from Registry does not exist: {SteamPath}", steamPath);
+                    return;
+                }
+                else
+                {
+                    steamPath = steamPathPossible!;
+                }
             }
-            
-            var steamPath = RegistryUtils.RegistryHelper.GetStringValueFromRegistry(steamKey, "SteamPath", Logger);
-            if (steamPath == null) return;
-            
-            if (!Directory.Exists(steamPath))
+            else
             {
-                Logger.LogError("Path to Steam from Registry does not exist: {SteamPath}", steamPath);
-                return;
+                steamPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".steam", "steam");
+                if (!Directory.Exists(steamPath))
+                {
+                    Logger.LogError("Default Steam path for Unix systems does not exist: {SteamPath}", steamPath);
+                    return;
+                }
             }
-#else
-            var steamPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".steam", "steam");
-            if (!Directory.Exists(steamPath))
-            {
-                Logger.LogError("Default Steam path for Unix systems does not exist: {SteamPath}", steamPath);
-                return;
-            }
-#endif
-            
-            var steamConfig = Path.Combine(steamPath, "config", "config.vdf");
+            //#if Windows
+            //            using var steamKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(SteamRegKey);
+            //            if (steamKey == null)
+            //            {
+            //                Logger.LogError("Unable to open registry key {SteamKey}", steamKey);
+            //                return;
+            //            }
+
+            //            var steamPath = RegistryUtils.RegistryHelper.GetStringValueFromRegistry(steamKey, "SteamPath", Logger);
+            //            if (steamPath == null) return;
+
+            //            if (!Directory.Exists(steamPath))
+            //            {
+            //                Logger.LogError("Path to Steam from Registry does not exist: {SteamPath}", steamPath);
+            //                return;
+            //            }
+            //#else
+            //            var steamPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            //                ".steam", "steam");
+            //            if (!Directory.Exists(steamPath))
+            //            {
+            //                Logger.LogError("Default Steam path for Unix systems does not exist: {SteamPath}", steamPath);
+            //                return;
+            //            }
+            //#endif
+
+            string steamConfig = Path.Combine(steamPath, "config", "config.vdf");
             if (!File.Exists(steamConfig))
             {
                 Logger.LogError("Unable to find config.vdf at {SteamConfigPath}", steamConfig);
                 return;
             }
-            
-            var steamLibraries = Path.Combine(steamPath, "config", "libraryfolders.vdf");
+
+            string steamLibraries = Path.Combine(steamPath, "config", "libraryfolders.vdf");
             if (!File.Exists(steamLibraries))
             {
                 Logger.LogWarning("Unable to find libraryfolders.vdf at {Path}", steamLibraries);
-                
+
                 steamLibraries = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
                 if (!File.Exists(steamLibraries))
                 {
@@ -114,19 +151,19 @@ namespace GameFinder.StoreHandlers.Steam
         {
             if (!Directory.Exists(steamPath))
                 throw new ArgumentException($"Directory does not exist: {steamPath}", nameof(steamPath));
-            
-            var steamConfig = Path.Combine(steamPath, "config", "config.vdf");
+
+            string steamConfig = Path.Combine(steamPath, "config", "config.vdf");
             if (!File.Exists(steamConfig))
             {
                 Logger.LogError("Unable to find config.vdf at {SteamConfigPath}", steamConfig);
                 return;
             }
 
-            var steamLibraries = Path.Combine(steamPath, "config", "libraryfolders.vdf");
+            string steamLibraries = Path.Combine(steamPath, "config", "libraryfolders.vdf");
             if (!File.Exists(steamLibraries))
             {
                 Logger.LogWarning("Unable to find libraryfolders.vdf at {Path}", steamLibraries);
-                
+
                 steamLibraries = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
                 if (!File.Exists(steamLibraries))
                 {
@@ -147,25 +184,25 @@ namespace GameFinder.StoreHandlers.Steam
             if (SteamConfig == null) return false;
             if (SteamLibraries == null) return false;
 
-            var configRes = ParseSteamConfig(SteamConfig, Logger);
-            var libraryFolders = ParseLibraryFolders(SteamLibraries, Logger);
-            
-            var allPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            List<string> configRes = ParseSteamConfig(SteamConfig, Logger);
+            List<string> libraryFolders = ParseLibraryFolders(SteamLibraries, Logger);
+
+            HashSet<string> allPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             allPaths.UnionWith(configRes);
             allPaths.UnionWith(libraryFolders);
 
-            foreach (var path in allPaths)
+            foreach (string? path in allPaths)
             {
-                var universePath = Path.Combine(path, "steamapps");
+                string universePath = Path.Combine(path, "steamapps");
                 if (!Directory.Exists(universePath))
                 {
                     Logger.LogWarning("Steam Universe at {Path} does not exist", universePath);
                     continue;
                 }
-                
+
                 SteamUniverses.Add(universePath);
             }
-            
+
             if (SteamPath == null)
             {
                 if (SteamUniverses.Count != 0) return true;
@@ -173,8 +210,8 @@ namespace GameFinder.StoreHandlers.Steam
                 return false;
 
             }
-            
-            var defaultPath = Path.Combine(SteamPath, "steamapps");
+
+            string defaultPath = Path.Combine(SteamPath, "steamapps");
             if (Directory.Exists(defaultPath))
                 SteamUniverses.Add(defaultPath);
 
@@ -189,16 +226,16 @@ namespace GameFinder.StoreHandlers.Steam
             if (!FoundSteam) return false;
             if (SteamConfig == null) return false;
             if (SteamLibraries == null) return false;
-            
-            var universeRes = FindAllUniverses();
+
+            bool universeRes = FindAllUniverses();
             if (!universeRes) return false;
-            
-            foreach (var universe in SteamUniverses)
+
+            foreach (string? universe in SteamUniverses)
             {
-                var acfFiles = Directory.EnumerateFiles(universe, "*.acf", SearchOption.TopDirectoryOnly);
-                foreach (var acfFile in acfFiles)
+                IEnumerable<string> acfFiles = Directory.EnumerateFiles(universe, "*.acf", SearchOption.TopDirectoryOnly);
+                foreach (string? acfFile in acfFiles)
                 {
-                    var game = ParseAcfFile(acfFile, Logger);
+                    SteamGame? game = ParseAcfFile(acfFile, Logger);
                     if (game == null) continue;
 
                     game.Path = Path.Combine(universe, "common", game.Path);
@@ -234,10 +271,10 @@ namespace GameFinder.StoreHandlers.Steam
         private static readonly Regex SteamConfigRegex = new(@"\""BaseInstallFolder_\d*\""\s*\""(?<path>[^\""]*)\""", RegexOptions.Compiled);
         private static readonly Regex OldLibraryFoldersRegex = new(@"^\s+\""\d+\""\s+\""(?<path>.+)\""", RegexOptions.Multiline | RegexOptions.Compiled);
         private static readonly Regex NewLibraryFoldersPathRegex = new(@"\""path\""\s*\""(?<path>[^\""]*)\""", RegexOptions.Compiled);
-        
+
         internal static List<string> ParseSteamConfig(string file, ILogger logger)
         {
-            var res = new List<string>();
+            List<string> res = new List<string>();
 
             if (!File.Exists(file))
             {
@@ -245,22 +282,22 @@ namespace GameFinder.StoreHandlers.Steam
                 return res;
             }
 
-            var text = File.ReadAllText(file, Encoding.UTF8);
-            var matches = SteamConfigRegex.Matches(text);
+            string text = File.ReadAllText(file, Encoding.UTF8);
+            MatchCollection matches = SteamConfigRegex.Matches(text);
 
             if (matches.Count == 0)
             {
                 logger.LogError("Found no Regex matches in Steam Config at {Path}", file);
                 return res;
             }
-            
+
             GetAllMatches("path", matches, path => res.Add(MakeValidPath(path)));
             return res;
         }
 
         internal static List<string> ParseLibraryFolders(string file, ILogger logger)
         {
-            var res = new List<string>();
+            List<string> res = new List<string>();
 
             if (!File.Exists(file))
             {
@@ -268,21 +305,21 @@ namespace GameFinder.StoreHandlers.Steam
                 return res;
             }
 
-            var lines = File.ReadLines(file, Encoding.UTF8);
-            var firstLine = lines.First();
+            IEnumerable<string> lines = File.ReadLines(file, Encoding.UTF8);
+            string firstLine = lines.First();
 
             // old format (before 1623193086 2021-06-08)
             if (firstLine.Contains("LibraryFolders", StringComparison.Ordinal))
             {
-                var text = File.ReadAllText(file, Encoding.UTF8);
-                var matches = OldLibraryFoldersRegex.Matches(text);
+                string text = File.ReadAllText(file, Encoding.UTF8);
+                MatchCollection matches = OldLibraryFoldersRegex.Matches(text);
 
                 if (matches.Count == 0)
                 {
                     logger.LogWarning("Found no matches in Library Folders file at {Path}", file);
                     return res;
                 }
-            
+
                 GetAllMatches("path", matches, path => res.Add(MakeValidPath(path)));
                 return res;
             }
@@ -290,9 +327,9 @@ namespace GameFinder.StoreHandlers.Steam
             // new format (after 1623193086 2021-06-08)
             if (firstLine.Contains("libraryfolders", StringComparison.Ordinal))
             {
-                var text = File.ReadAllText(file, Encoding.UTF8);
+                string text = File.ReadAllText(file, Encoding.UTF8);
 
-                var pathMatches = NewLibraryFoldersPathRegex.Matches(text);
+                MatchCollection pathMatches = NewLibraryFoldersPathRegex.Matches(text);
 
                 if (pathMatches.Count == 0)
                 {
@@ -300,7 +337,7 @@ namespace GameFinder.StoreHandlers.Steam
                     return res;
                 }
 
-                var pathValues = new List<string>();
+                List<string> pathValues = new List<string>();
                 GetAllMatches("path", pathMatches, path => pathValues.Add(path));
 
                 res.AddRange(pathValues.Select(MakeValidPath));
@@ -323,7 +360,7 @@ namespace GameFinder.StoreHandlers.Steam
             "BytesToStage",
             "BytesStaged"
         };
-        
+
         internal static SteamGame? ParseAcfFile(string file, ILogger logger)
         {
             if (!File.Exists(file))
@@ -332,47 +369,47 @@ namespace GameFinder.StoreHandlers.Steam
                 return null;
             }
 
-            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            
-            var lines = File.ReadLines(file, Encoding.UTF8);
-            foreach (var line in lines)
+            Dictionary<string, string> dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            IEnumerable<string> lines = File.ReadLines(file, Encoding.UTF8);
+            foreach (string? line in lines)
             {
-                var first = AcfKeys.FirstOrDefault(x => line.ContainsCaseInsensitive($"\"{x}\""));
+                string? first = AcfKeys.FirstOrDefault(x => line.ContainsCaseInsensitive($"\"{x}\""));
                 if (first == null) continue;
                 if (dict.ContainsKey(first)) continue;
 
-                var value = GetVdfValue(line, logger);
+                string? value = GetVdfValue(line, logger);
                 if (value == null) continue;
-                
+
                 dict.Add(first, value);
             }
 
             if (dict.Count != AcfKeys.Count)
             {
-                foreach (var acfKey in AcfKeys)
+                foreach (string? acfKey in AcfKeys)
                 {
                     if (dict.TryGetValue(acfKey, out _)) continue;
                     logger.LogError("ACF Manifest at {Path} does not contain a value with key {Key}", file, acfKey);
                 }
-                
+
                 return null;
             }
-            
-            var game = new SteamGame();
 
-            var sAppId = dict["appid"];
-            var name = dict["name"];
-            var installDir = dict["installdir"];
-            var sLastUpdated = dict["LastUpdated"];
-            var sSizeOnDisk = dict["SizeOnDisk"];
-            var sBytesToDownload = dict["BytesToDownload"];
-            var sBytesDownloaded = dict["BytesDownloaded"];
-            var sBytesToStage = dict["BytesToStage"];
-            var sBytesStaged = dict["BytesStaged"];
+            SteamGame game = new SteamGame();
 
-            if (!int.TryParse(sAppId, out var appId))
+            string? sAppId = dict["appid"];
+            string? name = dict["name"];
+            string? installDir = dict["installdir"];
+            string? sLastUpdated = dict["LastUpdated"];
+            string? sSizeOnDisk = dict["SizeOnDisk"];
+            string? sBytesToDownload = dict["BytesToDownload"];
+            string? sBytesDownloaded = dict["BytesDownloaded"];
+            string? sBytesToStage = dict["BytesToStage"];
+            string? sBytesStaged = dict["BytesStaged"];
+
+            if (!int.TryParse(sAppId, out int appId))
             {
-                logger.LogError("Unable to parse value \"{Value}\" (\"{ValueName}\") as {Type} in ACF Manifest {Path}", 
+                logger.LogError("Unable to parse value \"{Value}\" (\"{ValueName}\") as {Type} in ACF Manifest {Path}",
                     sAppId, "appid", "int", file);
                 return null;
             }
@@ -381,9 +418,9 @@ namespace GameFinder.StoreHandlers.Steam
 
             bool ParseAndSet(string value, string key, Action<long> action)
             {
-                if (!long.TryParse(value, out var lValue))
+                if (!long.TryParse(value, out long lValue))
                 {
-                    logger.LogError("Unable to parse value \"{Value}\" (\"{ValueName}\") as {Type} in ACF Manifest {Path}", 
+                    logger.LogError("Unable to parse value \"{Value}\" (\"{ValueName}\") as {Type} in ACF Manifest {Path}",
                         value, key, "long", file);
                     return false;
                 }
@@ -394,7 +431,7 @@ namespace GameFinder.StoreHandlers.Steam
 
             if (!ParseAndSet(sLastUpdated, "LastUpdated", timeStamp =>
             {
-                var dateTime = timeStamp.ToDateTime();
+                DateTime dateTime = timeStamp.ToDateTime();
                 game.LastUpdated = dateTime;
             }))
             {
@@ -423,34 +460,44 @@ namespace GameFinder.StoreHandlers.Steam
 
             return game;
         }
-        
+
         private static void GetAllMatches(string group, MatchCollection matches, Action<string> action)
         {
             foreach (Match match in matches)
             {
-                var groups = match.Groups;
+                //Debug.WriteLine($"Match: {match}");
+                GroupCollection groups = match.Groups;
 #if NET5_0_OR_GREATER
-                if (!groups.TryGetValue(group, out var currentGroup)) continue;
+                if (!groups.TryGetValue(group, out Group? currentGroup)) continue;
                 if (!currentGroup.Success) continue;
 #elif NETSTANDARD2_1
-                var currentGroup = groups.FirstOrDefault(x => x.Success && x.Name.Equals(group, StringComparison.OrdinalIgnoreCase));
+                Group? currentGroup = groups.FirstOrDefault(x => x.Success && x.Name.Equals(group, StringComparison.OrdinalIgnoreCase));
                 if (currentGroup == null) continue;
 #endif
+                //foreach (var match2 in groups)
+                //{
+                //    Debug.WriteLine($"Group: {match2}");
+                //}
 
                 action(currentGroup.Value);
             }
         }
-        
+
         private static string MakeValidPath(string input)
         {
-            var sb = new StringBuilder(input);
+            StringBuilder sb = new StringBuilder(input);
             sb.Replace("\\\\", "\\");
             return sb.ToString();
         }
-        
+
         private static string? GetVdfValue(string line, ILogger logger)
         {
-            var split = line.Split("\"");
+            string[]? split = line.Split("\"");
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                Debug.WriteLine($"Vdf Line: {line}");
+            }
+
             if (split.Length == 5) return split[3];
 
             logger.LogError("Unable to split line correctly in VDF file: {Line}", line);
