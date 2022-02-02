@@ -88,31 +88,6 @@ namespace GameFinder.StoreHandlers.Steam
                     return;
                 }
             }
-            //#if Windows
-            //            using var steamKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(SteamRegKey);
-            //            if (steamKey == null)
-            //            {
-            //                Logger.LogError("Unable to open registry key {SteamKey}", steamKey);
-            //                return;
-            //            }
-
-            //            var steamPath = RegistryUtils.RegistryHelper.GetStringValueFromRegistry(steamKey, "SteamPath", Logger);
-            //            if (steamPath == null) return;
-
-            //            if (!Directory.Exists(steamPath))
-            //            {
-            //                Logger.LogError("Path to Steam from Registry does not exist: {SteamPath}", steamPath);
-            //                return;
-            //            }
-            //#else
-            //            var steamPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            //                ".steam", "steam");
-            //            if (!Directory.Exists(steamPath))
-            //            {
-            //                Logger.LogError("Default Steam path for Unix systems does not exist: {SteamPath}", steamPath);
-            //                return;
-            //            }
-            //#endif
 
             string steamConfig = Path.Combine(steamPath, "config", "config.vdf");
             if (!File.Exists(steamConfig))

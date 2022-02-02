@@ -7,7 +7,7 @@ namespace GameFinder
     /// Abstract class of a Store Game
     /// </summary>
     [PublicAPI]
-    public abstract class AStoreGame : IComparable<AStoreGame>, IEquatable<AStoreGame>, ICloneable
+    public abstract class AStoreGame : IAStoreGame, IComparable<AStoreGame>, IEquatable<AStoreGame>, ICloneable
     {
         /// <summary>
         /// Name of the Game

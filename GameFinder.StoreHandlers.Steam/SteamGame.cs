@@ -7,7 +7,7 @@ namespace GameFinder.StoreHandlers.Steam
     /// Steam Game
     /// </summary>
     [PublicAPI]
-    public class SteamGame : AStoreGame
+    public class SteamGame : AStoreGame, ISteamGame
     {
 
 
